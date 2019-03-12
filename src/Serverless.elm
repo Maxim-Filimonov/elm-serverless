@@ -91,7 +91,7 @@ httpApi :
     HttpApi config model route interop msg
     -> Program config model route interop msg
 httpApi api =
-    Platform.programWithFlags
+    Platform.worker
         { init = init_ api
         , update = update_ api
         , subscriptions = sub_ api
@@ -274,7 +274,7 @@ init_ api flags =
 
         Err err ->
             ( { pool = ConnPool.empty
-              , configResult = Err <| err ++ " Flags(" ++ toString flags ++ ")"
+              , configResult = Err <| Json.Decode.errorToString err ++ " Flags(" ++ Debug.toString flags ++ ")"
               }
             , Cmd.none
             )
@@ -298,7 +298,7 @@ toSlsMsg api configResult rawMsg =
                         Ok req ->
                             case
                                 api.parseRoute <|
-                                    (Request.path req ++ Request.queryString req)
+                                    (Request.getPath req ++ Request.getQueryString req)
                             of
                                 Just route ->
                                     RequestAdd <| Conn.init id config api.initialModel route req
@@ -306,15 +306,15 @@ toSlsMsg api configResult rawMsg =
                                 Nothing ->
                                     ProcessingError id 404 False <|
                                         (++) "Could not parse route: "
-                                            (Request.path req)
+                                            (Request.getPath req)
 
                         Err err ->
                             ProcessingError id 500 False <|
                                 (++) "Misconfigured server. Make sure the elm-serverless npm package version matches the elm package version."
-                                    (toString err)
+                                    (Json.Decode.errorToString err)
 
-                action ->
-                    case decodeOutput api.interop action raw of
+                nonRequestAction ->
+                    case decodeOutput api.interop nonRequestAction raw of
                         Ok msg ->
                             RequestUpdate id msg
 
@@ -384,21 +384,21 @@ updateChildHelper api ( conn, cmd ) model =
         Nothing ->
             ( { model | pool = model.pool |> ConnPool.remove conn }
             , api.responsePort
-                ( Conn.id conn
+                ( Conn.getId conn
                 , "__response__"
                 , Conn.jsonEncodedResponse conn
                 )
             )
 
-        Just conn ->
+        Just connection ->
             ( { model
                 | pool =
                     ConnPool.replace
-                        (Conn.interopClear conn)
+                        (Conn.interopClear connection)
                         model.pool
               }
             , Cmd.batch
-                [ Cmd.map (HandlerMsg (Conn.id conn)) cmd
+                [ Cmd.map (HandlerMsg (Conn.getId conn)) cmd
                 , interopCallCmd api conn
                 ]
             )
@@ -443,13 +443,13 @@ interopCallCmd :
     -> Cmd (Msg msg)
 interopCallCmd api conn =
     conn
-        |> Conn.interopCalls
+        |> Conn.getInteropCalls
         |> List.map
             (\interop ->
                 api.responsePort
-                    ( Conn.id conn
+                    ( Conn.getId conn
                     , interopFunctionName interop
-                    , encodeInput api.interop interop
+                    , encodeInputFn api.interop interop
                     )
             )
         |> Cmd.batch
@@ -459,18 +459,18 @@ interopFunctionName : interop -> String
 interopFunctionName interop =
     let
         name =
-            interop |> toString |> String.split " " |> List.head |> Maybe.withDefault ""
+            interop |> Debug.toString |> String.split " " |> List.head |> Maybe.withDefault ""
     in
     (++)
         (name |> String.left 1 |> String.toLower)
         (name |> String.dropLeft 1)
 
 
-encodeInput :
+encodeInputFn :
     Interop interop msg
     -> interop
     -> Json.Encode.Value
-encodeInput { encodeInput } interop =
+encodeInputFn { encodeInput } interop =
     encodeInput interop
 
 
@@ -483,6 +483,7 @@ decodeOutput { outputDecoder } interopName jsonValue =
     case outputDecoder interopName of
         Just decoder ->
             Json.Decode.decodeValue decoder jsonValue
+                |> Result.mapError Json.Decode.errorToString
 
         Nothing ->
             Err <|
