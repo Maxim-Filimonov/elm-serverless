@@ -1,11 +1,12 @@
 module Serverless.Conn exposing
     ( Conn, Id
-    , config, model, updateModel
-    , request, id, method, header, route
+    , updateModel
+    , request, method, header
     , respond, updateResponse, send, toSent, unsent, mapUnsent
     , textBody, jsonBody, binaryBody
     , interop
-    , init, jsonEncodedResponse, interopCalls, interopClear
+    , init, jsonEncodedResponse, interopClear
+    , getConfig, getId, getInteropCalls, getModel, getRoute
     )
 
 {-| Functions for querying and updating connections.
@@ -110,15 +111,15 @@ type Sendable a
 
 {-| Application defined configuration
 -}
-config : Conn config model route interop -> config
-config (Conn { config }) =
+getConfig : Conn config model route interop -> config
+getConfig (Conn { config }) =
     config
 
 
 {-| Application defined model
 -}
-model : Conn config model route interop -> model
-model (Conn { model }) =
+getModel : Conn config model route interop -> model
+getModel (Conn { model }) =
     model
 
 
@@ -151,13 +152,13 @@ header key (Conn { req }) =
 -}
 method : Conn config model route interop -> Method
 method =
-    request >> Request.method
+    request >> Request.getMethod
 
 
 {-| Parsed route
 -}
-route : Conn config model route interop -> route
-route (Conn { route }) =
+getRoute : Conn config model route interop -> route
+getRoute (Conn { route }) =
     route
 
 
@@ -323,8 +324,8 @@ interop interopCalls (Conn conn) =
 
 {-| Get all schedule interop calls.
 -}
-interopCalls : Conn config model route interop -> List interop
-interopCalls (Conn { interopCalls }) =
+getInteropCalls : Conn config model route interop -> List interop
+getInteropCalls (Conn { interopCalls }) =
     interopCalls
 
 
@@ -341,8 +342,8 @@ interopClear (Conn conn) =
 
 {-| Universally unique Conn identifier
 -}
-id : Conn config model route interop -> Id
-id (Conn { id }) =
+getId : Conn config model route interop -> Id
+getId (Conn { id }) =
     id
 
 
@@ -370,8 +371,8 @@ This is the format the response takes when it gets sent through the response por
 jsonEncodedResponse : Conn config model route interop -> Json.Encode.Value
 jsonEncodedResponse (Conn { resp }) =
     case resp of
-        Unsent resp ->
-            Response.encode resp
+        Unsent response ->
+            Response.encode response
 
         Sent encodedValue ->
             encodedValue
