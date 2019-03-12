@@ -84,12 +84,14 @@ asJson body =
 
         Text val ->
             Decode.decodeString Decode.value val
+                |> Result.mapError Decode.errorToString
 
         Json val ->
             Ok val
 
         Binary _ val ->
             Decode.decodeString Decode.value val
+                |> Result.mapError Decode.errorToString
 
 
 
@@ -113,8 +115,8 @@ contentType body =
         Json _ ->
             "application/json"
 
-        Binary contentType _ ->
-            contentType
+        Binary bodyType _ ->
+            bodyType
 
         _ ->
             "text/text"
@@ -208,8 +210,7 @@ decoder maybeType =
                                     Decode.succeed <| Json val
 
                                 Err err ->
-                                    Decode.succeed <|
-                                        Error err
+                                    Decode.succeed <| Error (Decode.errorToString err)
 
                         else
                             Decode.succeed <| Text w
