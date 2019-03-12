@@ -1,9 +1,9 @@
 module Serverless.Conn.Request exposing
     ( Request, Method(..), Scheme(..)
-    , method, path, queryString
-    , body, asText, asJson
-    , header, query, endpoint, stage
+    , asText, asJson
+    , header, query, endpoint
     , init, decoder, methodDecoder, schemeDecoder
+    , getBody, getMethod, getPath, getQueryString, getStage
     )
 
 {-| Query attributes of the HTTP request.
@@ -55,8 +55,8 @@ used internally by the framework.
 -}
 
 import Dict exposing (Dict)
-import Json.Decode as Decode exposing (Decoder, andThen)
-import Json.Decode.Pipeline exposing (decode, hardcoded, required)
+import Json.Decode as Decode exposing (Decoder, andThen, succeed)
+import Json.Decode.Pipeline exposing (hardcoded, required)
 import Json.Encode
 import Serverless.Conn.Body as Body exposing (Body)
 import Serverless.Conn.IpAddress as IpAddress exposing (IpAddress)
@@ -147,8 +147,8 @@ init =
 
 {-| Request body.
 -}
-body : Request -> Body
-body (Request { body }) =
+getBody : Request -> Body
+getBody (Request { body }) =
     body
 
 
@@ -204,8 +204,8 @@ header key (Request { headers }) =
             -- method not supported...
 
 -}
-method : Request -> Method
-method (Request { method }) =
+getMethod : Request -> Method
+getMethod (Request { method }) =
     method
 
 
@@ -215,8 +215,8 @@ While you can access this attribute directly, it is better to provide a
 `parseRoute` function to the framework.
 
 -}
-path : Request -> String
-path (Request { path }) =
+getPath : Request -> String
+getPath (Request { path }) =
     path
 
 
@@ -233,15 +233,15 @@ While you can access this attribute directly, it is better to provide a
 `parseRoute` function to the framework.
 
 -}
-queryString : Request -> String
-queryString (Request { queryString }) =
+getQueryString : Request -> String
+getQueryString (Request { queryString }) =
     queryString
 
 
 {-| IP address of the requesting entity.
 -}
-remoteIp : Request -> IpAddress
-remoteIp (Request { remoteIp }) =
+getRemoteIp : Request -> IpAddress
+getRemoteIp (Request { remoteIp }) =
     remoteIp
 
 
@@ -250,8 +250,8 @@ remoteIp (Request { remoteIp }) =
 See <https://serverless.com/framework/docs/providers/aws/guide/deploying/>
 
 -}
-stage : Request -> String
-stage (Request { stage }) =
+getStage : Request -> String
+getStage (Request { stage }) =
     stage
 
 
@@ -263,7 +263,7 @@ stage (Request { stage }) =
 -}
 decoder : Decoder Request
 decoder =
-    decode HeadersOnly
+    succeed HeadersOnly
         |> required "headers" (KeyValueList.decoder |> Decode.map Dict.fromList)
         |> andThen (Decode.map Request << modelDecoder)
 
@@ -275,7 +275,7 @@ type alias HeadersOnly =
 
 modelDecoder : HeadersOnly -> Decoder Model
 modelDecoder { headers } =
-    decode Model
+    succeed Model
         |> required "body" (Body.decoder <| Dict.get "content-type" headers)
         |> hardcoded headers
         |> required "host" Decode.string
