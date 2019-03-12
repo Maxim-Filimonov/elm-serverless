@@ -39,7 +39,7 @@ replace conn (Pool pool) =
         { pool
             | connDict =
                 Dict.insert
-                    (Conn.id conn)
+                    (Conn.getId conn)
                     conn
                     pool.connDict
         }
@@ -54,7 +54,7 @@ remove conn (Pool pool) =
         { pool
             | connDict =
                 pool.connDict
-                    |> Dict.remove (Conn.id conn)
+                    |> Dict.remove (Conn.getId conn)
         }
 
 
