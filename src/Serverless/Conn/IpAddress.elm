@@ -28,8 +28,12 @@ import Json.Decode as Decode exposing (Decoder, andThen)
 
 {-| IP address type.
 -}
-type IpAddress
-    = Ip4 ( Int, Int, Int, Int )
+type alias IpAddress =
+    { first : Int
+    , second : Int
+    , third : Int
+    , fourth : Int
+    }
 
 
 
@@ -40,7 +44,7 @@ type IpAddress
 -}
 ip4 : Int -> Int -> Int -> Int -> IpAddress
 ip4 a b c d =
-    Ip4 ( a, b, c, d )
+    IpAddress a b c d
 
 
 {-| The loopback address.
@@ -51,7 +55,7 @@ ip4 a b c d =
 -}
 loopback : IpAddress
 loopback =
-    Ip4 ( 127, 0, 0, 1 )
+    IpAddress 127 0 0 1
 
 
 
@@ -68,10 +72,10 @@ decoder =
                 w
                     |> String.split "."
                     |> List.map toNonNegativeInt
-                    |> maybeList
+                    |> maybeListFn
                     |> require4
                     |> Maybe.andThen take4Tuple
-                    |> Maybe.map (Decode.succeed << Ip4)
+                    |> Maybe.map Decode.succeed
                     |> Maybe.withDefault (Decode.fail <| "Unsupported IP address: " ++ w)
             )
 
@@ -79,14 +83,14 @@ decoder =
 toNonNegativeInt : String -> Maybe Int
 toNonNegativeInt val =
     case val |> String.toInt of
-        Ok i ->
+        Just i ->
             if i >= 0 then
                 Just i
 
             else
                 Nothing
 
-        Err _ ->
+        Nothing ->
             Nothing
 
 
@@ -109,23 +113,23 @@ require4 maybeList =
 -- From https://package.elm-lang.org/packages/danielnarey/elm-toolkit/4.5.0/Toolkit-Helpers
 
 
-take4Tuple : List a -> Maybe ( a, a, a, a )
+take4Tuple : List Int -> Maybe IpAddress
 take4Tuple list =
     case list of
         a :: b :: c :: d :: _ ->
-            Just ( a, b, c, d )
+            Just (IpAddress a b c d)
 
         _ ->
             Nothing
 
 
-maybeList : List (Maybe a) -> Maybe (List a)
-maybeList list =
+maybeListFn : List (Maybe a) -> Maybe (List a)
+maybeListFn list =
     case list |> List.take 1 of
         [ Just value ] ->
             list
                 |> List.drop 1
-                |> maybeList
+                |> maybeListFn
                 |> Maybe.map ((::) value)
 
         [] ->
